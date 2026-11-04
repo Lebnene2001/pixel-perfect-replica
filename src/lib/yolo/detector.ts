@@ -58,9 +58,9 @@ function preprocess(img: HTMLImageElement) {
   const size = INPUT * INPUT;
   const out = new Float32Array(3 * size);
   for (let i = 0; i < size; i++) {
-    out[i] = data[i * 4] / 255;
-    out[i + size] = data[i * 4 + 1] / 255;
-    out[i + 2 * size] = data[i * 4 + 2] / 255;
+    out[i] = data[i * 4]! / 255;
+    out[i + size] = data[i * 4 + 1]! / 255;
+    out[i + 2 * size] = data[i * 4 + 2]! / 255;
   }
   return { tensorData: out, scale };
 }
@@ -81,7 +81,9 @@ export async function detect(img: HTMLImageElement): Promise<Detection[]> {
   const input = new ort.Tensor("float32", tensorData, [1, 3, INPUT, INPUT]);
   const results = await session.run({ [session.inputNames[0]]: input });
   const output = results[session.outputNames[0]];
-  const [, channels, anchors] = output.dims as number[]; // [1, 4+nc, 8400]
+  const dims = output.dims as number[];
+  const channels = dims[1]!;
+  const anchors = dims[2]!; // [1, 4+nc, 8400]
   const d = output.data as Float32Array;
   const nc = channels - 4;
 
@@ -90,7 +92,7 @@ export async function detect(img: HTMLImageElement): Promise<Detection[]> {
     let best = 0;
     let cls = -1;
     for (let c = 0; c < nc; c++) {
-      const s = d[(4 + c) * anchors + i];
+      const s = d[(4 + c) * anchors + i]!;
       if (s > best) {
         best = s;
         cls = c;
@@ -98,14 +100,14 @@ export async function detect(img: HTMLImageElement): Promise<Detection[]> {
     }
     // Bottle-specific pass: small models often rank "vase"/"cup" above "bottle"
     // for transparent bottles, so keep a bottle candidate even if not the top class.
-    const bottleScore = d[(4 + TARGET_IDX) * anchors + i];
+    const bottleScore = d[(4 + TARGET_IDX) * anchors + i]!;
     if (cls !== TARGET_IDX && bottleScore >= TARGET_THRESHOLD) {
-      const bx = d[i], by = d[anchors + i], bw = d[2 * anchors + i], bh = d[3 * anchors + i];
+      const bx = d[i]!, by = d[anchors + i]!, bw = d[2 * anchors + i]!, bh = d[3 * anchors + i]!;
       candidates.push({ cls: TARGET_IDX, label: TARGET_CLASS, score: bottleScore,
         box: [(bx - bw / 2) / scale, (by - bh / 2) / scale, bw / scale, bh / scale] });
     }
     if (best < CONF_THRESHOLD) continue;
-    const cx = d[i], cy = d[anchors + i], w = d[2 * anchors + i], h = d[3 * anchors + i];
+    const cx = d[i]!, cy = d[anchors + i]!, w = d[2 * anchors + i]!, h = d[3 * anchors + i]!;
     candidates.push({
       cls,
       label: CLASSES[cls] ?? `class_${cls}`,
