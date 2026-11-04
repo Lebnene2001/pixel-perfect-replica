@@ -181,7 +181,7 @@ function Index() {
             {busy && <div className="scan-line" />}
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-2">
             {cameraOn ? (
               <Button onClick={capture} className="col-span-2"><Camera /> Capturer</Button>
             ) : (

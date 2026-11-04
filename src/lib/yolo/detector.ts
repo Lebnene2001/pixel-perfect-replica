@@ -12,6 +12,8 @@ export const TARGET_CLASS = "bottle";
 const INPUT = 640;
 const CONF_THRESHOLD = 0.25;
 const IOU_THRESHOLD = 0.45;
+const TARGET_THRESHOLD = 0.15;
+const TARGET_IDX = COCO_CLASSES.indexOf("bottle");
 
 export type Detection = {
   label: string;
@@ -94,6 +96,14 @@ export async function detect(img: HTMLImageElement): Promise<Detection[]> {
         cls = c;
       }
     }
+    // Bottle-specific pass: small models often rank "vase"/"cup" above "bottle"
+    // for transparent bottles, so keep a bottle candidate even if not the top class.
+    const bottleScore = d[(4 + TARGET_IDX) * anchors + i];
+    if (cls !== TARGET_IDX && bottleScore >= TARGET_THRESHOLD) {
+      const bx = d[i], by = d[anchors + i], bw = d[2 * anchors + i], bh = d[3 * anchors + i];
+      candidates.push({ cls: TARGET_IDX, label: TARGET_CLASS, score: bottleScore,
+        box: [(bx - bw / 2) / scale, (by - bh / 2) / scale, bw / scale, bh / scale] });
+    }
     if (best < CONF_THRESHOLD) continue;
     const cx = d[i], cy = d[anchors + i], w = d[2 * anchors + i], h = d[3 * anchors + i];
     candidates.push({
@@ -109,5 +119,8 @@ export async function detect(img: HTMLImageElement): Promise<Detection[]> {
   for (const c of candidates) {
     if (kept.every((k) => k.cls !== c.cls || iou(k.box, c.box) < IOU_THRESHOLD)) kept.push(c);
   }
-  return kept.map(({ label, score, box }) => ({ label, score, box }));
+  // If a bottle overlaps another object strongly, prefer the bottle label.
+  const bottles = kept.filter((k) => k.cls === TARGET_IDX);
+  const final = kept.filter((k) => k.cls === TARGET_IDX || bottles.every((b) => iou(b.box, k.box) < 0.6));
+  return final.map(({ label, score, box }) => ({ label, score, box }));
 }
